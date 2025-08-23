@@ -1,0 +1,259 @@
+/* Modern Dark Theme - Subtitle Catcher */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  margin: 0;
+  padding: 0;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  color: #e6e6e6;
+  width: 380px;
+  min-height: 500px;
+  overflow-x: hidden;
+}
+
+.container {
+  display: flex;
+  flex-direction: column;
+  min-height: 500px;
+}
+
+/* Header */
+header {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 20px;
+  text-align: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+}
+
+h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  background: linear-gradient(45deg, #4cc9f0, #4361ee);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.subtitle {
+  font-size: 12px;
+  opacity: 0.8;
+  margin-top: 4px;
+}
+
+/* Content Area */
+.content {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.stats-bar {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+/* Subtitles List */
+.subtitles-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 350px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #4361ee #1e1e2e;
+}
+
+.subtitles-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.subtitles-list::-webkit-scrollbar-track {
+  background: #1e1e2e;
+  border-radius: 2px;
+}
+
+.subtitles-list::-webkit-scrollbar-thumb {
+  background: #4361ee;
+  border-radius: 2px;
+}
+
+.subtitles-list li {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+  animation: slideIn 0.3s ease-out;
+}
+
+.subtitles-list li:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: #4361ee;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.subtitle-name {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 8px;
+  word-break: break-all;
+  color: #fff;
+}
+
+.subtitle-info {
+  font-size: 11px;
+  color: #a0a0a0;
+  margin-bottom: 12px;
+}
+
+.subtitle-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* Buttons */
+.btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-primary {
+  background: linear-gradient(45deg, #4361ee, #4cc9f0);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: linear-gradient(45deg, #3a56d4, #45b4d9);
+  transform: translateY(-1px);
+}
+
+.btn-danger {
+  background: linear-gradient(45deg, #ef476f, #ff9e00);
+  color: white;
+}
+
+.btn-danger:hover {
+  background: linear-gradient(45deg, #d63d62, #e58e00);
+  transform: translateY(-1px);
+}
+
+.btn-success {
+  background: linear-gradient(45deg, #06d6a0, #118ab2);
+  color: white;
+  padding: 6px 12px;
+  font-size: 11px;
+}
+
+.btn-success:hover {
+  background: linear-gradient(45deg, #05b98a, #0f7a9d);
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  padding: 6px 12px;
+  font-size: 11px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+.btn-icon {
+  font-size: 14px;
+}
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: #a0a0a0;
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.empty-state h3 {
+  margin: 0 0 8px 0;
+  color: #fff;
+  font-size: 16px;
+}
+
+.empty-state p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* Footer Actions */
+.actions {
+  padding: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  gap: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(10px);
+}
+
+/* Notification animations */
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+.new-subtitle {
+  animation: pulse 0.5s ease-in-out;
+}
+
+/* Responsive design */
+@media (max-height: 600px) {
+  body {
+    min-height: 400px;
+  }
+  
+  .container {
+    min-height: 400px;
+  }
+  
+  .subtitles-list {
+    max-height: 250px;
+  }
+}
