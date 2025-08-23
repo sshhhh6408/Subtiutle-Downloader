@@ -29,6 +29,24 @@
       </div>
     </div>
 
+    <div class="youtube-section">
+      <h3>🎬 YouTube Subtitle Extractor</h3>
+      <div class="youtube-controls">
+        <button id="extractCurrentBtn" class="btn btn-youtube" title="Extract from current YouTube tab">
+          <span class="btn-icon">🎯</span>
+          Extract Current Video
+        </button>
+        <div class="url-input-group">
+          <input type="text" id="youtubeUrlInput" placeholder="Enter YouTube URL or Video ID" class="url-input">
+          <button id="extractUrlBtn" class="btn btn-youtube" title="Extract from URL">
+            <span class="btn-icon">🔗</span>
+            Extract
+          </button>
+        </div>
+      </div>
+      <div id="extractionStatus" class="extraction-status" style="display: none;"></div>
+    </div>
+
     <footer class="actions">
       <button id="refreshBtn" class="btn btn-primary" title="Refresh list">
         <span class="btn-icon">🔄</span>

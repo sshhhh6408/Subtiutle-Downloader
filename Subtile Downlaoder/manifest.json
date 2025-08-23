@@ -7,14 +7,27 @@
     "storage",
     "downloads",
     "webRequest",
-    "tabs"  // Add this line
+    "tabs",
+    "activeTab",
+    "scripting"
   ],
   "host_permissions": [
-    "<all_urls>"
+    "<all_urls>",
+    "*://www.youtube.com/*",
+    "*://m.youtube.com/*",
+    "*://video.google.com/*"
   ],
   "background": {
     "service_worker": "background.js"
   },
+  "content_scripts": [
+    {
+      "matches": ["*://www.youtube.com/*", "*://m.youtube.com/*"],
+      "js": ["youtube-content.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {

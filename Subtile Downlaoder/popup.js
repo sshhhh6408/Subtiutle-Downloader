@@ -5,6 +5,12 @@ const emptyState = document.getElementById('emptyState');
 const subtitleCount = document.getElementById('subtitleCount');
 const lastUpdate = document.getElementById('lastUpdate');
 
+// YouTube extraction elements
+const extractCurrentBtn = document.getElementById('extractCurrentBtn');
+const extractUrlBtn = document.getElementById('extractUrlBtn');
+const youtubeUrlInput = document.getElementById('youtubeUrlInput');
+const extractionStatus = document.getElementById('extractionStatus');
+
 function formatFileSize(bytes) {
   if (bytes === 0) return '0 Bytes';
   const k = 1024;
@@ -49,6 +55,9 @@ function renderList(subtitles) {
     const nameDiv = document.createElement('div');
     nameDiv.className = 'subtitle-name';
     nameDiv.textContent = file.name;
+    if (file.source) {
+      nameDiv.setAttribute('data-source', file.source);
+    }
     
     const infoDiv = document.createElement('div');
     infoDiv.className = 'subtitle-info';
@@ -240,6 +249,157 @@ clearBtn.addEventListener('click', async () => {
 
 // Initialize
 refreshList();
+
+// YouTube extraction functionality
+function showExtractionStatus(message, type = 'loading') {
+  extractionStatus.style.display = 'block';
+  extractionStatus.className = `extraction-status ${type}`;
+  extractionStatus.textContent = message;
+  
+  if (type !== 'loading') {
+    setTimeout(() => {
+      extractionStatus.style.display = 'none';
+    }, 5000);
+  }
+}
+
+function extractVideoIdFromUrl(url) {
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
+    /^([a-zA-Z0-9_-]{11})$/ // Direct video ID
+  ];
+  
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match) return match[1];
+  }
+  
+  return null;
+}
+
+async function extractFromCurrentTab() {
+  try {
+    extractCurrentBtn.disabled = true;
+    extractCurrentBtn.innerHTML = '⏳ Extracting...';
+    showExtractionStatus('🔍 Detecting YouTube video in current tab...', 'loading');
+    
+    // Get current tab
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    
+    if (!tab.url || !tab.url.includes('youtube.com')) {
+      throw new Error('Current tab is not a YouTube video page');
+    }
+    
+    const response = await new Promise((resolve) => {
+      chrome.runtime.sendMessage({ type: 'extractCurrentTab' }, resolve);
+    });
+    
+    if (response?.success) {
+      showExtractionStatus(`✅ Successfully started extraction for video: ${response.videoId}`, 'success');
+      setTimeout(() => refreshList(), 2000);
+    } else {
+      throw new Error(response?.error || 'Failed to extract from current tab');
+    }
+  } catch (error) {
+    console.error('Current tab extraction error:', error);
+    showExtractionStatus(`❌ ${error.message}`, 'error');
+  } finally {
+    extractCurrentBtn.innerHTML = '🎯 Extract Current Video';
+    extractCurrentBtn.disabled = false;
+  }
+}
+
+async function extractFromUrl() {
+  try {
+    const url = youtubeUrlInput.value.trim();
+    if (!url) {
+      throw new Error('Please enter a YouTube URL or video ID');
+    }
+    
+    const videoId = extractVideoIdFromUrl(url);
+    if (!videoId) {
+      throw new Error('Invalid YouTube URL or video ID');
+    }
+    
+    extractUrlBtn.disabled = true;
+    extractUrlBtn.innerHTML = '⏳ Extracting...';
+    showExtractionStatus(`🔍 Starting advanced extraction for video: ${videoId}...`, 'loading');
+    
+    const response = await new Promise((resolve) => {
+      chrome.runtime.sendMessage({ 
+        type: 'extractYouTubeVideo', 
+        videoId: videoId,
+        tabInfo: { title: `YouTube Video ${videoId}`, url: `https://www.youtube.com/watch?v=${videoId}` }
+      }, resolve);
+    });
+    
+    if (response?.success) {
+      showExtractionStatus(`✅ Advanced extraction initiated for ${videoId}. Check back in a few moments.`, 'success');
+      youtubeUrlInput.value = '';
+      setTimeout(() => refreshList(), 3000);
+    } else {
+      throw new Error(response?.error || 'Failed to extract subtitles');
+    }
+  } catch (error) {
+    console.error('URL extraction error:', error);
+    showExtractionStatus(`❌ ${error.message}`, 'error');
+  } finally {
+    extractUrlBtn.innerHTML = '🔗 Extract';
+    extractUrlBtn.disabled = false;
+  }
+}
+
+// Enhanced message listener for YouTube extraction updates
+chrome.runtime.onMessage.addListener((message) => {
+  if (message.type === 'newSubtitle') {
+    console.log('New subtitle detected:', message.name);
+    refreshList();
+    
+    // Show enhanced notification for YouTube subtitles
+    const isYouTube = message.source === 'YouTube';
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background: ${isYouTube ? 'linear-gradient(45deg, #ff0000, #cc0000)' : 'linear-gradient(45deg, #06d6a0, #118ab2)'};
+      color: white;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      z-index: 1000;
+      max-width: 300px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      animation: slideIn 0.3s ease-out;
+    `;
+    notification.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span>${isYouTube ? '🎬' : '🆕'}</span>
+        <div>
+          <div style="font-weight: 700;">${isYouTube ? 'YouTube Subtitle' : 'New Subtitle'}</div>
+          <div style="font-size: 11px; opacity: 0.9;">${message.name}</div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+      notification.remove();
+    }, isYouTube ? 5000 : 3000);
+  }
+});
+
+// YouTube extraction event listeners
+extractCurrentBtn.addEventListener('click', extractFromCurrentTab);
+extractUrlBtn.addEventListener('click', extractFromUrl);
+
+// Enter key support for URL input
+youtubeUrlInput.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') {
+    extractFromUrl();
+  }
+});
 
 // Auto-refresh every 30 seconds to catch new subtitles
 setInterval(refreshList, 30000);
