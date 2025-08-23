@@ -366,11 +366,23 @@ class YouTubeSubtitleExtractor {
   
   static async processYouTubeSubtitle(content, url, videoId, language = '', format = 'vtt', tabInfo = {}) {
     try {
-      // Generate smart filename
-      const title = tabInfo.title || 'YouTube Video';
-      const cleanTitle = title.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
+      // Generate smart filename with better sanitization
+      let title = tabInfo.title || 'YouTube_Video';
+      
+      // Remove common YouTube suffixes and clean title
+      title = title.replace(/\s*-\s*YouTube\s*$/, '')
+                  .replace(/[^\w\s-]/g, ' ')
+                  .replace(/\s+/g, '_')
+                  .substring(0, 50); // Limit length
+      
+      // Ensure we have a valid title
+      if (!title || title.trim() === '') {
+        title = 'YouTube_Video';
+      }
+      
       const langSuffix = language ? `_${language}` : '';
-      const filename = `${cleanTitle}_${videoId}${langSuffix}.${format}`;
+      const formatSuffix = format ? `.${format}` : '.vtt';
+      const filename = `${title}_${videoId}${langSuffix}${formatSuffix}`;
       
       // Convert content to base64
       const base64Content = btoa(unescape(encodeURIComponent(content)));
