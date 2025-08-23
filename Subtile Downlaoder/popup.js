@@ -11,6 +11,11 @@ const extractUrlBtn = document.getElementById('extractUrlBtn');
 const youtubeUrlInput = document.getElementById('youtubeUrlInput');
 const extractionStatus = document.getElementById('extractionStatus');
 
+// Universal extraction elements
+const extractUniversalBtn = document.getElementById('extractUniversalBtn');
+const platformInfo = document.getElementById('platformInfo');
+const universalStatus = document.getElementById('universalStatus');
+
 function formatFileSize(bytes) {
   if (bytes === 0) return '0 Bytes';
   const k = 1024;
@@ -390,14 +395,119 @@ chrome.runtime.onMessage.addListener((message) => {
   }
 });
 
+// Universal extraction functionality
+function showUniversalStatus(message, type = 'loading') {
+  universalStatus.style.display = 'block';
+  universalStatus.className = `extraction-status ${type}`;
+  universalStatus.textContent = message;
+  
+  if (type !== 'loading') {
+    setTimeout(() => {
+      universalStatus.style.display = 'none';
+    }, 5000);
+  }
+}
+
+async function detectCurrentPlatform() {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    
+    if (!tab.url) {
+      platformInfo.innerHTML = '<span class="platform-name">No active tab</span>';
+      return;
+    }
+    
+    const hostname = new URL(tab.url).hostname.toLowerCase();
+    
+    // Platform detection
+    const platforms = {
+      'netflix.com': { name: 'Netflix', icon: '🎬', color: '#e50914' },
+      'hulu.com': { name: 'Hulu', icon: '📺', color: '#1ce783' },
+      'disneyplus.com': { name: 'Disney+', icon: '🏰', color: '#113ccf' },
+      'primevideo.com': { name: 'Prime Video', icon: '📦', color: '#00a8e1' },
+      'amazon.com': { name: 'Prime Video', icon: '📦', color: '#00a8e1' },
+      'twitch.tv': { name: 'Twitch', icon: '🟣', color: '#9146ff' },
+      'vimeo.com': { name: 'Vimeo', icon: '🎭', color: '#1ab7ea' },
+      'dailymotion.com': { name: 'Dailymotion', icon: '🌊', color: '#00adef' },
+      'crunchyroll.com': { name: 'Crunchyroll', icon: '🍥', color: '#f47521' },
+      'youtube.com': { name: 'YouTube', icon: '🎬', color: '#ff0000' }
+    };
+    
+    let detectedPlatform = null;
+    for (const [domain, info] of Object.entries(platforms)) {
+      if (hostname.includes(domain)) {
+        detectedPlatform = info;
+        break;
+      }
+    }
+    
+    if (detectedPlatform) {
+      platformInfo.innerHTML = `<span class="platform-name" style="color: ${detectedPlatform.color};">${detectedPlatform.icon} ${detectedPlatform.name} Detected!</span>`;
+      platformInfo.classList.add('platform-detected');
+    } else {
+      platformInfo.innerHTML = '<span class="platform-name">🌐 Generic Video Site</span>';
+      platformInfo.classList.remove('platform-detected');
+    }
+  } catch (error) {
+    platformInfo.innerHTML = '<span class="platform-name">❌ Detection failed</span>';
+  }
+}
+
+async function extractUniversal() {
+  try {
+    extractUniversalBtn.disabled = true;
+    extractUniversalBtn.innerHTML = '⏳ Extracting...';
+    showUniversalStatus('🔍 Starting UNIVERSAL extraction with 25+ advanced methods...', 'loading');
+    
+    // Get current tab
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    
+    if (!tab.url) {
+      throw new Error('No active tab found');
+    }
+    
+    // Send message to content script
+    const response = await chrome.tabs.sendMessage(tab.id, { type: 'extractUniversal' });
+    
+    if (response?.success) {
+      const platform = response.platform || 'Generic';
+      showUniversalStatus(`✅ Universal extraction initiated for ${platform}! Using ALL 25 methods simultaneously.`, 'success');
+      setTimeout(() => refreshList(), 3000);
+    } else {
+      throw new Error('Failed to start universal extraction');
+    }
+  } catch (error) {
+    console.error('Universal extraction error:', error);
+    showUniversalStatus(`❌ ${error.message}`, 'error');
+  } finally {
+    extractUniversalBtn.innerHTML = '🔥 Extract from ANY Site';
+    extractUniversalBtn.disabled = false;
+  }
+}
+
 // YouTube extraction event listeners
 extractCurrentBtn.addEventListener('click', extractFromCurrentTab);
 extractUrlBtn.addEventListener('click', extractFromUrl);
+extractUniversalBtn.addEventListener('click', extractUniversal);
 
 // Enter key support for URL input
 youtubeUrlInput.addEventListener('keypress', (e) => {
   if (e.key === 'Enter') {
     extractFromUrl();
+  }
+});
+
+// Initialize platform detection
+detectCurrentPlatform();
+
+// Update platform detection when tab changes
+chrome.tabs.onActivated.addListener(() => {
+  setTimeout(detectCurrentPlatform, 500);
+});
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.status === 'complete') {
+    setTimeout(detectCurrentPlatform, 500);
   }
 });
 

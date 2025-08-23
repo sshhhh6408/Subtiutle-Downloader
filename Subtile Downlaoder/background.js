@@ -420,6 +420,103 @@ class YouTubeSubtitleExtractor {
   }
 }
 
+// Universal Subtitle Processor for ALL websites
+class UniversalSubtitleProcessor {
+  static async processUniversalSubtitle(content, url, platform, source, filename, tabInfo = {}) {
+    try {
+      log(`Processing universal subtitle from ${platform} [${source}]:`, filename);
+      
+      // Generate enhanced filename if not provided
+      if (!filename) {
+        filename = this.generateUniversalFilename(url, platform, content, tabInfo);
+      }
+      
+      // Convert content to base64
+      const base64Content = btoa(unescape(encodeURIComponent(content)));
+      
+      // Store in storage
+      const { subtitles = [] } = await chrome.storage.local.get('subtitles');
+      
+      // Check if already exists
+      const exists = subtitles.some(sub => 
+        sub.url === url || 
+        sub.name === filename ||
+        (sub.platform === platform && sub.contentHash === this.hashContent(content))
+      );
+      
+      if (!exists) {
+        subtitles.push({
+          name: filename,
+          data: base64Content,
+          url: url,
+          platform: platform,
+          source: source,
+          timestamp: Date.now(),
+          size: content.length,
+          pageTitle: tabInfo.title || '',
+          pageUrl: tabInfo.url || '',
+          contentHash: this.hashContent(content),
+          extractionMethod: 'universal-advanced'
+        });
+        
+        await chrome.storage.local.set({ subtitles });
+        log(`✅ Universal subtitle saved: ${filename} from ${platform}`);
+        
+        // Notify popup
+        try {
+          await chrome.runtime.sendMessage({ 
+            type: 'newSubtitle', 
+            name: filename,
+            source: platform.charAt(0).toUpperCase() + platform.slice(1)
+          });
+        } catch (e) {
+          // Silent fail if popup not open
+        }
+      } else {
+        log(`⚠️ Duplicate subtitle skipped: ${filename}`);
+      }
+    } catch (error) {
+      log('Error processing universal subtitle:', error);
+    }
+  }
+  
+  static generateUniversalFilename(url, platform, content, tabInfo) {
+    // Extract title and clean it
+    let title = tabInfo.title || 'Unknown_Video';
+    title = title.replace(/[^\w\s-]/g, ' ')
+                 .replace(/\s+/g, '_')
+                 .substring(0, 40);
+    
+    // Platform prefix
+    const platformPrefix = platform !== 'generic' ? `${platform.toUpperCase()}_` : '';
+    
+    // Timestamp for uniqueness
+    const timestamp = Date.now().toString().slice(-6);
+    
+    // Detect format from content
+    let format = 'txt';
+    const contentLower = content.toLowerCase();
+    if (contentLower.includes('webvtt')) format = 'vtt';
+    else if (contentLower.includes('<ttml') || contentLower.includes('<timedtext')) format = 'ttml';
+    else if (contentLower.includes('[script info]')) format = 'ass';
+    else if (contentLower.includes('{"events"') || contentLower.includes('"events"')) format = 'json';
+    else if (contentLower.includes('-->')) format = 'srt';
+    
+    return `${platformPrefix}${title}_${timestamp}.${format}`;
+  }
+  
+  static hashContent(content) {
+    // Simple hash for duplicate detection
+    let hash = 0;
+    for (let i = 0; i < content.length; i++) {
+      const char = content.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    return hash.toString(16);
+  }
+}
+
 // Clean up old cache entries
 function cleanupCache() {
   if (headerCache.size > 1000) {
@@ -895,6 +992,31 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               '', // language will be detected from URL if present
               'vtt', // default format
               { title: pageTitle, url: pageUrl }
+            );
+          }
+          sendResponse({ success: true });
+          break;
+          
+        case 'newUniversalSubtitle':
+          // Handle subtitle data from universal content script
+          const { 
+            content: uContent, 
+            url: uUrl, 
+            platform, 
+            source, 
+            filename, 
+            pageTitle: uPageTitle, 
+            pageUrl: uPageUrl 
+          } = message;
+          
+          if (uContent) {
+            await UniversalSubtitleProcessor.processUniversalSubtitle(
+              uContent,
+              uUrl,
+              platform,
+              source,
+              filename,
+              { title: uPageTitle, url: uPageUrl }
             );
           }
           sendResponse({ success: true });
