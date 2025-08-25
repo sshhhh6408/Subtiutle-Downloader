@@ -1,13 +1,14 @@
-// Enhanced subtitle catcher with automatic file naming and YouTube support
+// Universal Subtitle Catcher Pro - Multi-Platform Support
 const headerCache = new Map();
 const processedUrls = new Set();
 const failedUrls = new Set();
 const EXTENSION_MARKER = 'x-subtitle-catcher';
 const MAX_RETRIES = 2;
 
-// YouTube specific caches
-const youtubeSubtitleCache = new Map();
-const processedYouTubeVideos = new Set();
+// Platform-specific caches
+const platformSubtitleCache = new Map();
+const processedVideos = new Map(); // Map of platform -> Set of video IDs
+const platformExtractors = new Map();
 
 // Debug logging
 const DEBUG = true;
@@ -15,7 +16,124 @@ function log(...args) {
   if (DEBUG) console.log('[SubtitleCatcher]', ...args);
 }
 
-// YouTube subtitle extraction utilities
+// Universal subtitle extraction utilities
+class UniversalSubtitleExtractor {
+  static async processSubtitle(content, url, platform, videoId, language = '', format = 'vtt', tabInfo = {}) {
+    try {
+      log(`Processing ${platform} subtitle:`, { url, videoId, language, format });
+      
+      // Generate filename based on platform and video info
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const title = tabInfo.title || `${platform} Video`;
+      const safeTitle = title.replace(/[^a-zA-Z0-9\s-]/g, '').substring(0, 50);
+      
+      let filename = '';
+      let extension = '';
+      
+      // Platform-specific filename generation
+      switch (platform.toLowerCase()) {
+        case 'youtube':
+          filename = `YouTube_${videoId}_${language || 'en'}_${timestamp}`;
+          break;
+        case 'netflix':
+          filename = `Netflix_${videoId}_${language || 'en'}_${timestamp}`;
+          break;
+        case 'hulu':
+          filename = `Hulu_${videoId}_${language || 'en'}_${timestamp}`;
+          break;
+        case 'disneyplus':
+          filename = `DisneyPlus_${videoId}_${language || 'en'}_${timestamp}`;
+          break;
+        case 'amazonprime':
+          filename = `AmazonPrime_${videoId}_${language || 'en'}_${timestamp}`;
+          break;
+        case 'twitch':
+          filename = `Twitch_${videoId}_${language || 'en'}_${timestamp}`;
+          break;
+        case 'vimeo':
+          filename = `Vimeo_${videoId}_${language || 'en'}_${timestamp}`;
+          break;
+        case 'dailymotion':
+          filename = `Dailymotion_${videoId}_${language || 'en'}_${timestamp}`;
+          break;
+        default:
+          filename = `${platform}_${videoId}_${language || 'en'}_${timestamp}`;
+      }
+      
+      // Determine file extension based on format
+      switch (format.toLowerCase()) {
+        case 'vtt':
+        case 'webvtt':
+          extension = '.vtt';
+          break;
+        case 'srt':
+          extension = '.srt';
+          break;
+        case 'srv1':
+        case 'srv2':
+        case 'srv3':
+          extension = '.srv';
+          break;
+        case 'ttml':
+          extension = '.ttml';
+          break;
+        case 'json':
+          extension = '.json';
+          break;
+        case 'xml':
+          extension = '.xml';
+          break;
+        default:
+          extension = '.txt';
+      }
+      
+      const fullFilename = `${filename}${extension}`;
+      
+      // Convert content to base64
+      const data = btoa(unescape(encodeURIComponent(content)));
+      
+      // Save to storage
+      const subtitleFile = {
+        name: fullFilename,
+        data: data,
+        size: content.length,
+        timestamp: Date.now(),
+        url: url,
+        platform: platform,
+        videoId: videoId,
+        language: language,
+        format: format,
+        source: platform
+      };
+      
+      const { subtitles = [] } = await chrome.storage.local.get('subtitles');
+      subtitles.unshift(subtitleFile);
+      
+      // Keep only the latest 100 subtitles
+      if (subtitles.length > 100) {
+        subtitles.splice(100);
+      }
+      
+      await chrome.storage.local.set({ subtitles });
+      
+      log(`${platform} subtitle saved: ${fullFilename}`);
+      
+      // Notify popup if open
+      chrome.runtime.sendMessage({
+        type: 'newSubtitle',
+        name: fullFilename,
+        source: platform
+      }).catch(() => {
+        // Popup might not be open, ignore error
+      });
+      
+    } catch (error) {
+      log(`Error processing ${platform} subtitle:`, error);
+    }
+  }
+}
+
+// YouTube subtitle extraction utilities (legacy support)
 class YouTubeSubtitleExtractor {
   static async extractSubtitlesFromVideoId(videoId, tabInfo = {}) {
     if (processedYouTubeVideos.has(videoId)) {
@@ -881,17 +999,36 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           failedUrls.clear();
           processedYouTubeVideos.clear();
           youtubeSubtitleCache.clear();
+          platformSubtitleCache.clear();
+          processedVideos.clear();
+          sendResponse({ success: true });
+          break;
+          
+        case 'newSubtitle':
+          // Handle subtitle data from universal content script
+          const { content, url, platform, videoId, timestamp } = message.data;
+          if (content && platform && videoId) {
+            await UniversalSubtitleExtractor.processSubtitle(
+              content, 
+              url, 
+              platform, 
+              videoId, 
+              '', // language will be detected from URL if present
+              'vtt', // default format
+              { title: `${platform} Video ${videoId}`, url: url }
+            );
+          }
           sendResponse({ success: true });
           break;
           
         case 'newYouTubeSubtitle':
-          // Handle subtitle data from content script
-          const { content, url, videoId, pageTitle, pageUrl } = message;
-          if (content && videoId) {
+          // Handle subtitle data from content script (legacy support)
+          const { content: ytContent, url: ytUrl, videoId: ytVideoId, pageTitle, pageUrl } = message;
+          if (ytContent && ytVideoId) {
             await YouTubeSubtitleExtractor.processYouTubeSubtitle(
-              content, 
-              url, 
-              videoId, 
+              ytContent, 
+              ytUrl, 
+              ytVideoId, 
               '', // language will be detected from URL if present
               'vtt', // default format
               { title: pageTitle, url: pageUrl }
@@ -900,11 +1037,28 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           sendResponse({ success: true });
           break;
           
+        case 'extractSubtitles':
+          // Universal extraction request for any platform
+          const { platform: targetPlatform, videoId: targetVideoId, tabInfo: targetTabInfo } = message;
+          if (targetPlatform && targetVideoId) {
+            if (targetPlatform.toLowerCase() === 'youtube') {
+              await YouTubeSubtitleExtractor.extractSubtitlesFromVideoId(targetVideoId, targetTabInfo);
+            } else {
+              // For other platforms, trigger content script extraction
+              log(`Triggering ${targetPlatform} subtitle extraction for video: ${targetVideoId}`);
+              // The content script will handle the actual extraction
+            }
+            sendResponse({ success: true });
+          } else {
+            sendResponse({ success: false, error: 'No platform or video ID provided' });
+          }
+          break;
+          
         case 'extractYouTubeVideo':
-          // Manual extraction request
-          const { videoId: targetVideoId, tabInfo } = message;
-          if (targetVideoId) {
-            await YouTubeSubtitleExtractor.extractSubtitlesFromVideoId(targetVideoId, tabInfo);
+          // Manual extraction request (legacy support)
+          const { videoId: ytTargetVideoId, tabInfo: ytTabInfo } = message;
+          if (ytTargetVideoId) {
+            await YouTubeSubtitleExtractor.extractSubtitlesFromVideoId(ytTargetVideoId, ytTabInfo);
             sendResponse({ success: true });
           } else {
             sendResponse({ success: false, error: 'No video ID provided' });
@@ -1025,24 +1179,62 @@ setInterval(() => {
   }
 }, 300000);
 
-// Monitor for YouTube tabs and auto-extract subtitles
+// Monitor for video platform tabs and auto-extract subtitles
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-  if (changeInfo.status === 'complete' && tab.url && tab.url.includes('youtube.com/watch')) {
-    const urlObj = new URL(tab.url);
-    const videoId = urlObj.searchParams.get('v');
+  if (changeInfo.status === 'complete' && tab.url) {
+    const url = tab.url;
     
-    if (videoId && !processedYouTubeVideos.has(videoId)) {
-      log('Auto-extracting subtitles for YouTube video:', videoId);
+    // Check for YouTube
+    if (url.includes('youtube.com/watch')) {
+      const urlObj = new URL(url);
+      const videoId = urlObj.searchParams.get('v');
       
-      // Wait a bit for the page to fully load
-      setTimeout(async () => {
-        await YouTubeSubtitleExtractor.extractSubtitlesFromVideoId(videoId, {
-          title: tab.title,
-          url: tab.url
-        });
-      }, 3000);
+      if (videoId && !processedYouTubeVideos.has(videoId)) {
+        log('Auto-extracting subtitles for YouTube video:', videoId);
+        
+        // Wait a bit for the page to fully load
+        setTimeout(async () => {
+          await YouTubeSubtitleExtractor.extractSubtitlesFromVideoId(videoId, {
+            title: tab.title,
+            url: tab.url
+          });
+        }, 3000);
+      }
+    }
+    
+    // Check for other platforms
+    const platforms = {
+      netflix: /netflix\.com\/watch\/(\d+)/,
+      hulu: /hulu\.com\/watch\/([^&\n?#]+)/,
+      disneyplus: /disneyplus\.com\/video\/([^&\n?#]+)/,
+      amazonprime: /(?:amazon\.com\/.*\/dp\/([A-Z0-9]+)|primevideo\.com\/detail\/([^&\n?#]+))/,
+      twitch: /twitch\.tv\/videos\/(\d+)/,
+      vimeo: /vimeo\.com\/(\d+)/,
+      dailymotion: /dailymotion\.com\/video\/([^&\n?#]+)/
+    };
+    
+    for (const [platform, pattern] of Object.entries(platforms)) {
+      const match = url.match(pattern);
+      if (match) {
+        const videoId = match[1] || match[2];
+        const processedSet = processedVideos.get(platform) || new Set();
+        
+        if (videoId && !processedSet.has(videoId)) {
+          log(`Auto-extracting subtitles for ${platform} video:`, videoId);
+          processedSet.add(videoId);
+          processedVideos.set(platform, processedSet);
+          
+          // The content script will handle the extraction
+          setTimeout(() => {
+            chrome.tabs.sendMessage(tabId, { type: 'extractSubtitles' }).catch(() => {
+              // Content script might not be ready yet
+            });
+          }, 3000);
+        }
+        break;
+      }
     }
   }
 });
 
-log('Subtitle Catcher background script initialized with YouTube support and automatic naming');
+log('Universal Subtitle Catcher Pro background script initialized with multi-platform support');
