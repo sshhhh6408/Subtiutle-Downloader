@@ -5,11 +5,12 @@ const emptyState = document.getElementById('emptyState');
 const subtitleCount = document.getElementById('subtitleCount');
 const lastUpdate = document.getElementById('lastUpdate');
 
-// YouTube extraction elements
+// Platform extraction elements
 const extractCurrentBtn = document.getElementById('extractCurrentBtn');
 const extractUrlBtn = document.getElementById('extractUrlBtn');
-const youtubeUrlInput = document.getElementById('youtubeUrlInput');
+const urlInput = document.getElementById('urlInput');
 const extractionStatus = document.getElementById('extractionStatus');
+const platformCards = document.querySelectorAll('.platform-card');
 
 function formatFileSize(bytes) {
   if (bytes === 0) return '0 Bytes';
@@ -250,7 +251,7 @@ clearBtn.addEventListener('click', async () => {
 // Initialize
 refreshList();
 
-// YouTube extraction functionality
+// Platform extraction functionality
 function showExtractionStatus(message, type = 'loading') {
   extractionStatus.style.display = 'block';
   extractionStatus.className = `extraction-status ${type}`;
@@ -263,15 +264,59 @@ function showExtractionStatus(message, type = 'loading') {
   }
 }
 
-function extractVideoIdFromUrl(url) {
-  const patterns = [
-    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
-    /^([a-zA-Z0-9_-]{11})$/ // Direct video ID
-  ];
+function detectPlatformFromUrl(url) {
+  const platforms = {
+    youtube: {
+      name: 'YouTube',
+      patterns: [
+        /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
+        /^([a-zA-Z0-9_-]{11})$/
+      ]
+    },
+    netflix: {
+      name: 'Netflix',
+      patterns: [/netflix\.com\/watch\/(\d+)/]
+    },
+    hulu: {
+      name: 'Hulu',
+      patterns: [/hulu\.com\/watch\/([^&\n?#]+)/]
+    },
+    disneyplus: {
+      name: 'Disney+',
+      patterns: [/disneyplus\.com\/video\/([^&\n?#]+)/]
+    },
+    amazonprime: {
+      name: 'Amazon Prime',
+      patterns: [
+        /amazon\.com\/.*\/dp\/([A-Z0-9]+)/,
+        /primevideo\.com\/detail\/([^&\n?#]+)/
+      ]
+    },
+    twitch: {
+      name: 'Twitch',
+      patterns: [/twitch\.tv\/videos\/(\d+)/]
+    },
+    vimeo: {
+      name: 'Vimeo',
+      patterns: [/vimeo\.com\/(\d+)/]
+    },
+    dailymotion: {
+      name: 'Dailymotion',
+      patterns: [/dailymotion\.com\/video\/([^&\n?#]+)/]
+    }
+  };
   
-  for (const pattern of patterns) {
-    const match = url.match(pattern);
-    if (match) return match[1];
+  for (const [key, platform] of Object.entries(platforms)) {
+    for (const pattern of platform.patterns) {
+      const match = url.match(pattern);
+      if (match) {
+        return {
+          key,
+          name: platform.name,
+          id: match[1]
+        };
+      }
+    }
   }
   
   return null;
@@ -281,24 +326,36 @@ async function extractFromCurrentTab() {
   try {
     extractCurrentBtn.disabled = true;
     extractCurrentBtn.innerHTML = '⏳ Extracting...';
-    showExtractionStatus('🔍 Detecting YouTube video in current tab...', 'loading');
+    showExtractionStatus('🔍 Detecting video in current tab...', 'loading');
     
     // Get current tab
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     
-    if (!tab.url || !tab.url.includes('youtube.com')) {
-      throw new Error('Current tab is not a YouTube video page');
+    if (!tab.url) {
+      throw new Error('Could not access current tab URL');
     }
     
+    const platformInfo = detectPlatformFromUrl(tab.url);
+    if (!platformInfo) {
+      throw new Error('Current tab is not a supported video platform');
+    }
+    
+    showExtractionStatus(`🎬 Extracting subtitles from ${platformInfo.name}...`, 'loading');
+    
     const response = await new Promise((resolve) => {
-      chrome.runtime.sendMessage({ type: 'extractCurrentTab' }, resolve);
+      chrome.runtime.sendMessage({ 
+        type: 'extractSubtitles',
+        platform: platformInfo.key,
+        videoId: platformInfo.id,
+        tabInfo: { title: tab.title, url: tab.url }
+      }, resolve);
     });
     
     if (response?.success) {
-      showExtractionStatus(`✅ Successfully started extraction for video: ${response.videoId}`, 'success');
+      showExtractionStatus(`✅ Successfully started extraction for ${platformInfo.name} video: ${platformInfo.id}`, 'success');
       setTimeout(() => refreshList(), 2000);
     } else {
-      throw new Error(response?.error || 'Failed to extract from current tab');
+      throw new Error(response?.error || `Failed to extract from ${platformInfo.name}`);
     }
   } catch (error) {
     console.error('Current tab extraction error:', error);
@@ -311,34 +368,35 @@ async function extractFromCurrentTab() {
 
 async function extractFromUrl() {
   try {
-    const url = youtubeUrlInput.value.trim();
+    const url = urlInput.value.trim();
     if (!url) {
-      throw new Error('Please enter a YouTube URL or video ID');
+      throw new Error('Please enter a video URL from a supported platform');
     }
     
-    const videoId = extractVideoIdFromUrl(url);
-    if (!videoId) {
-      throw new Error('Invalid YouTube URL or video ID');
+    const platformInfo = detectPlatformFromUrl(url);
+    if (!platformInfo) {
+      throw new Error('Invalid URL or unsupported platform');
     }
     
     extractUrlBtn.disabled = true;
     extractUrlBtn.innerHTML = '⏳ Extracting...';
-    showExtractionStatus(`🔍 Starting advanced extraction for video: ${videoId}...`, 'loading');
+    showExtractionStatus(`🔍 Starting extraction for ${platformInfo.name} video: ${platformInfo.id}...`, 'loading');
     
     const response = await new Promise((resolve) => {
       chrome.runtime.sendMessage({ 
-        type: 'extractYouTubeVideo', 
-        videoId: videoId,
-        tabInfo: { title: `YouTube Video ${videoId}`, url: `https://www.youtube.com/watch?v=${videoId}` }
+        type: 'extractSubtitles',
+        platform: platformInfo.key,
+        videoId: platformInfo.id,
+        tabInfo: { title: `${platformInfo.name} Video ${platformInfo.id}`, url: url }
       }, resolve);
     });
     
     if (response?.success) {
-      showExtractionStatus(`✅ Advanced extraction initiated for ${videoId}. Check back in a few moments.`, 'success');
-      youtubeUrlInput.value = '';
+      showExtractionStatus(`✅ Extraction initiated for ${platformInfo.name} video: ${platformInfo.id}. Check back in a few moments.`, 'success');
+      urlInput.value = '';
       setTimeout(() => refreshList(), 3000);
     } else {
-      throw new Error(response?.error || 'Failed to extract subtitles');
+      throw new Error(response?.error || `Failed to extract ${platformInfo.name} subtitles`);
     }
   } catch (error) {
     console.error('URL extraction error:', error);
@@ -390,15 +448,23 @@ chrome.runtime.onMessage.addListener((message) => {
   }
 });
 
-// YouTube extraction event listeners
+// Platform extraction event listeners
 extractCurrentBtn.addEventListener('click', extractFromCurrentTab);
 extractUrlBtn.addEventListener('click', extractFromUrl);
 
 // Enter key support for URL input
-youtubeUrlInput.addEventListener('keypress', (e) => {
+urlInput.addEventListener('keypress', (e) => {
   if (e.key === 'Enter') {
     extractFromUrl();
   }
+});
+
+// Platform card event listeners
+platformCards.forEach(card => {
+  card.addEventListener('click', () => {
+    const platform = card.getAttribute('data-platform');
+    showExtractionStatus(`🎯 Selected ${platform} platform. Use the extraction buttons above.`, 'success');
+  });
 });
 
 // Auto-refresh every 30 seconds to catch new subtitles

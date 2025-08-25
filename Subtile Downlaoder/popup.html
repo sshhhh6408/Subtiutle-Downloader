@@ -29,22 +29,83 @@
       </div>
     </div>
 
-    <div class="youtube-section">
-      <h3>🎬 YouTube Subtitle Extractor</h3>
-      <div class="youtube-controls">
-        <button id="extractCurrentBtn" class="btn btn-youtube" title="Extract from current YouTube tab">
+    <div class="platform-section">
+      <h3>🎯 Multi-Platform Subtitle Extractor</h3>
+      <div class="platform-grid">
+        <div class="platform-card" data-platform="youtube">
+          <div class="platform-icon">📺</div>
+          <div class="platform-name">YouTube</div>
+        </div>
+        <div class="platform-card" data-platform="netflix">
+          <div class="platform-icon">🎬</div>
+          <div class="platform-name">Netflix</div>
+        </div>
+        <div class="platform-card" data-platform="hulu">
+          <div class="platform-icon">🍃</div>
+          <div class="platform-name">Hulu</div>
+        </div>
+        <div class="platform-card" data-platform="disneyplus">
+          <div class="platform-icon">🏰</div>
+          <div class="platform-name">Disney+</div>
+        </div>
+        <div class="platform-card" data-platform="amazonprime">
+          <div class="platform-icon">📦</div>
+          <div class="platform-name">Amazon Prime</div>
+        </div>
+        <div class="platform-card" data-platform="twitch">
+          <div class="platform-icon">🎮</div>
+          <div class="platform-name">Twitch</div>
+        </div>
+        <div class="platform-card" data-platform="vimeo">
+          <div class="platform-icon">🎥</div>
+          <div class="platform-name">Vimeo</div>
+        </div>
+        <div class="platform-card" data-platform="dailymotion">
+          <div class="platform-icon">📹</div>
+          <div class="platform-name">Dailymotion</div>
+        </div>
+      </div>
+      
+      <div class="extraction-controls">
+        <button id="extractCurrentBtn" class="btn btn-primary" title="Extract from current tab">
           <span class="btn-icon">🎯</span>
           Extract Current Video
         </button>
         <div class="url-input-group">
-          <input type="text" id="youtubeUrlInput" placeholder="Enter YouTube URL or Video ID" class="url-input">
-          <button id="extractUrlBtn" class="btn btn-youtube" title="Extract from URL">
+          <input type="text" id="urlInput" placeholder="Enter video URL from any supported platform" class="url-input">
+          <button id="extractUrlBtn" class="btn btn-primary" title="Extract from URL">
             <span class="btn-icon">🔗</span>
             Extract
           </button>
         </div>
       </div>
       <div id="extractionStatus" class="extraction-status" style="display: none;"></div>
+    </div>
+
+    <div class="supported-platforms">
+      <h4>Supported Platforms:</h4>
+      <div class="platform-list">
+        <span class="platform-tag">YouTube</span>
+        <span class="platform-tag">Netflix</span>
+        <span class="platform-tag">Hulu</span>
+        <span class="platform-tag">Disney+</span>
+        <span class="platform-tag">Amazon Prime</span>
+        <span class="platform-tag">Twitch</span>
+        <span class="platform-tag">Vimeo</span>
+        <span class="platform-tag">Dailymotion</span>
+        <span class="platform-tag">Crunchyroll</span>
+        <span class="platform-tag">Funimation</span>
+        <span class="platform-tag">HBO Max</span>
+        <span class="platform-tag">Peacock</span>
+        <span class="platform-tag">Paramount+</span>
+        <span class="platform-tag">Apple TV+</span>
+        <span class="platform-tag">Tubi TV</span>
+        <span class="platform-tag">Pluto TV</span>
+        <span class="platform-tag">Roku</span>
+        <span class="platform-tag">Vudu</span>
+        <span class="platform-tag">Redbox</span>
+        <span class="platform-tag">Crackle</span>
+      </div>
     </div>
 
     <footer class="actions">
